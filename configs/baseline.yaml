@@ -1,0 +1,27 @@
+
+
+#model_name: "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+#device: "cuda"
+#dtype: "float16"
+
+#input_lengths: [1024]
+#max_new_tokens: 128
+
+#num_trials: 1
+#warmup_trials: 1
+
+#output_csv: "results/raw/baseline.csv"
+
+
+# CPU - Running in Terminal
+model_name: "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+device: "cpu"
+dtype: "float32"
+
+input_lengths: [256]
+max_new_tokens: 32
+
+num_trials: 1
+warmup_trials: 0
+
+output_csv: "results/raw/baseline.csv"
