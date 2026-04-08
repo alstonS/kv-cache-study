@@ -7,4 +7,4 @@ env/
 results/raw/*.csv
 *.log
 .DS_Store
-results/
+
