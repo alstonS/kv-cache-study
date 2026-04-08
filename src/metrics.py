@@ -21,34 +21,87 @@ def run_benchmark_trial(model, inputs, max_new_tokens: int, device: str):
         "generated_tokens": 0,
         "tokens_per_sec": 0.0,
         "peak_memory_mb": 0.0,
+        "prefill_sec": 0.0,
+        "decode_sec": 0.0,
+        "ttft_sec": 0.0,
         "oom": False,
     }
 
     try:
         reset_gpu_stats(device)
 
-        start = time.perf_counter()
+        input_ids = inputs["input_ids"]
+        attention_mask = inputs.get("attention_mask", None)
+
+        # Prefill pass
+        start_prefill = time.perf_counter()
         with torch.no_grad():
-            outputs = model.generate(
-                **inputs,
-                max_new_tokens=max_new_tokens,
-                do_sample=False,
+            outputs = model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
                 use_cache=True,
             )
         if device == "cuda":
             torch.cuda.synchronize()
-        end = time.perf_counter()
+        end_prefill = time.perf_counter()
 
-        elapsed = end - start
-        generated_tokens = outputs.shape[1] - inputs["input_ids"].shape[1]
-        peak_mem_mb = get_peak_memory_mb(device)
-        toks_per_sec = generated_tokens / elapsed if elapsed > 0 else 0.0
+        past_key_values = outputs.past_key_values
+        next_token = torch.argmax(outputs.logits[:, -1, :], dim=-1, keepdim=True)
+
+        prefill_sec = end_prefill - start_prefill
+        ttft_sec = prefill_sec  # first token available after prefill
+
+        generated = [next_token]
+        decode_start = time.perf_counter()
+
+        cur_input_ids = next_token
+        cur_attention_mask = attention_mask
+        if cur_attention_mask is not None:
+            ones = torch.ones(
+                (cur_attention_mask.shape[0], 1),
+                dtype=cur_attention_mask.dtype,
+                device=cur_attention_mask.device,
+            )
+            cur_attention_mask = torch.cat([cur_attention_mask, ones], dim=1)
+
+        for _ in range(max_new_tokens - 1):
+            with torch.no_grad():
+                outputs = model(
+                    input_ids=cur_input_ids,
+                    attention_mask=cur_attention_mask,
+                    past_key_values=past_key_values,
+                    use_cache=True,
+                )
+            past_key_values = outputs.past_key_values
+            cur_input_ids = torch.argmax(outputs.logits[:, -1, :], dim=-1, keepdim=True)
+            generated.append(cur_input_ids)
+
+            if cur_attention_mask is not None:
+                ones = torch.ones(
+                    (cur_attention_mask.shape[0], 1),
+                    dtype=cur_attention_mask.dtype,
+                    device=cur_attention_mask.device,
+                )
+                cur_attention_mask = torch.cat([cur_attention_mask, ones], dim=1)
+
+        if device == "cuda":
+            torch.cuda.synchronize()
+        decode_end = time.perf_counter()
+
+        decode_sec = decode_end - decode_start
+        total_time_sec = prefill_sec + decode_sec
+        generated_tokens = len(generated)
+        peak_memory_mb = get_peak_memory_mb(device)
+        tokens_per_sec = generated_tokens / total_time_sec if total_time_sec > 0 else 0.0
 
         result.update({
-            "total_time_sec": elapsed,
+            "total_time_sec": total_time_sec,
             "generated_tokens": generated_tokens,
-            "tokens_per_sec": toks_per_sec,
-            "peak_memory_mb": peak_mem_mb,
+            "tokens_per_sec": tokens_per_sec,
+            "peak_memory_mb": peak_memory_mb,
+            "prefill_sec": prefill_sec,
+            "decode_sec": decode_sec,
+            "ttft_sec": ttft_sec,
         })
 
     except torch.cuda.OutOfMemoryError:
