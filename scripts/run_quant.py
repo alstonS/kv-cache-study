@@ -96,6 +96,7 @@ def main():
                     "total_time_sec": result["total_time_sec"],
                     "generated_tokens": result["generated_tokens"],
                     "tokens_per_sec": result["tokens_per_sec"],
+                    "decode_tokens_per_sec": result["decode_tokens_per_sec"],
                     "peak_memory_mb": result["peak_memory_mb"],
                     "prefill_sec": result["prefill_sec"],
                     "decode_sec": result["decode_sec"],
