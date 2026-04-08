@@ -20,6 +20,7 @@ def run_benchmark_trial(model, inputs, max_new_tokens: int, device: str):
         "total_time_sec": 0.0,
         "generated_tokens": 0,
         "tokens_per_sec": 0.0,
+        "decode_tokens_per_sec": 0.0,
         "peak_memory_mb": 0.0,
         "prefill_sec": 0.0,
         "decode_sec": 0.0,
@@ -93,11 +94,13 @@ def run_benchmark_trial(model, inputs, max_new_tokens: int, device: str):
         generated_tokens = len(generated)
         peak_memory_mb = get_peak_memory_mb(device)
         tokens_per_sec = generated_tokens / total_time_sec if total_time_sec > 0 else 0.0
+        decode_tokens_per_sec = generated_tokens / decode_sec if decode_sec > 0 else 0.0
 
         result.update({
             "total_time_sec": total_time_sec,
             "generated_tokens": generated_tokens,
             "tokens_per_sec": tokens_per_sec,
+            "decode_tokens_per_sec": decode_tokens_per_sec,
             "peak_memory_mb": peak_memory_mb,
             "prefill_sec": prefill_sec,
             "decode_sec": decode_sec,
