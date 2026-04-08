@@ -1,0 +1,33 @@
+# CPU config — quick correctness check on a laptop / no GPU
+model_name: "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+device: "cpu"
+dtype: "float32"
+
+input_lengths: [256]
+max_new_tokens: 32
+
+num_trials: 1
+warmup_trials: 0
+
+# INT8: symmetric 8-bit  (2× memory reduction vs FP16)
+# INT4: packed 4-bit      (4× memory reduction vs FP16)
+# INT3: 3-bit grid stored as INT8 (same memory as INT8; exercises 3-bit accuracy)
+quant_bits: [8, 4, 3]
+
+output_csv: "results/raw/quant.csv"
+
+
+# ── GPU / HPC cluster config (uncomment and adjust) ──────────────────────────
+#model_name: "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+#device: "cuda"
+#dtype: "float16"
+#
+#input_lengths: [1024, 2048, 4096, 8192]
+#max_new_tokens: 128
+#
+#num_trials: 3
+#warmup_trials: 1
+#
+#quant_bits: [8, 4, 3]
+#
+#output_csv: "results/raw/quant.csv"
