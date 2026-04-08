@@ -1,5 +1,13 @@
 import subprocess
 import sys
+import argparse
 
 if __name__ == "__main__":
-    subprocess.run([sys.executable, "scripts/run_baseline.py"], check=True)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", type=str, default="configs/baseline.yaml")
+    args = parser.parse_args()
+
+    subprocess.run(
+        [sys.executable, "scripts/run_baseline.py", "--config", args.config],
+        check=True
+    )

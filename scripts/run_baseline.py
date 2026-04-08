@@ -8,23 +8,32 @@ sys.path.append(os.path.abspath("."))
 
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from src.prompts import build_prompt_to_length
-from src.metrics import timed_generate, get_peak_memory_mb
+from src.metrics import run_benchmark_trial
 from src.logger import append_result
 from src.utils import DTYPE_MAP
 
 
 def main():
-    with open("configs/baseline.yaml", "r") as f:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", type=str, default="configs/baseline.yaml")
+    args = parser.parse_args()
+
+    with open(args.config, "r") as f:
         config = yaml.safe_load(f)
 
     model_name = config["model_name"]
     device = config["device"]
-    dtype = DTYPE_MAP[config["dtype"]]
+    dtype_name = config["dtype"]
+    dtype = DTYPE_MAP[dtype_name]
+
     input_lengths = config["input_lengths"]
     max_new_tokens = config["max_new_tokens"]
     num_trials = config["num_trials"]
     warmup_trials = config["warmup_trials"]
     output_csv = config["output_csv"]
+
+    if device == "cuda" and not torch.cuda.is_available():
+        raise RuntimeError("torch.cuda.is_available() is False.")
 
     print(f"Loading tokenizer: {model_name}")
     tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -39,6 +48,11 @@ def main():
     ).to(device)
     model.eval()
 
+    print(f"CUDA available: {torch.cuda.is_available()}")
+    print(f"Requested device: {device}")
+    print(f"Model device: {next(model.parameters()).device}")
+    print(f"Dtype: {dtype_name}")
+
     for input_len in input_lengths:
         print(f"\nRunning input length = {input_len}")
 
@@ -51,35 +65,35 @@ def main():
 
         for i in range(warmup_trials):
             print(f"Warmup {i+1}/{warmup_trials}")
-            with torch.no_grad():
-                _ = model.generate(
-                    **encoded,
-                    max_new_tokens=8,
-                    do_sample=False,
-                    use_cache=True,
-                )
-            if torch.cuda.is_available():
-                torch.cuda.synchronize()
+            _ = run_benchmark_trial(
+                model=model,
+                inputs=encoded,
+                max_new_tokens=min(8, max_new_tokens),
+                device=device,
+            )
 
         for trial in range(num_trials):
             print(f"Trial {trial+1}/{num_trials}")
 
-            outputs, elapsed = timed_generate(model, encoded, max_new_tokens)
-            peak_mem_mb = get_peak_memory_mb()
-
-            total_output_len = outputs.shape[1]
-            generated_tokens = total_output_len - actual_input_len
-            toks_per_sec = generated_tokens / elapsed if elapsed > 0 else 0.0
+            result = run_benchmark_trial(
+                model=model,
+                inputs=encoded,
+                max_new_tokens=max_new_tokens,
+                device=device,
+            )
 
             row = {
                 "model_name": model_name,
+                "device": device,
+                "dtype": dtype_name,
                 "input_length": actual_input_len,
                 "max_new_tokens": max_new_tokens,
                 "trial": trial + 1,
-                "total_time_sec": elapsed,
-                "generated_tokens": generated_tokens,
-                "tokens_per_sec": toks_per_sec,
-                "peak_memory_mb": peak_mem_mb,
+                "total_time_sec": result["total_time_sec"],
+                "generated_tokens": result["generated_tokens"],
+                "tokens_per_sec": result["tokens_per_sec"],
+                "peak_memory_mb": result["peak_memory_mb"],
+                "oom": result["oom"],
             }
 
             append_result(output_csv, row)
@@ -90,3 +104,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
