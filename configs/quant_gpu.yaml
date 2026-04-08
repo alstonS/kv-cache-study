@@ -1,0 +1,17 @@
+model_name: "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+device: "cuda"
+dtype: "float16"
+
+# Start modestly first so you verify the quant path on GPU before scaling up.
+input_lengths: [256, 512, 1024, 2048]
+max_new_tokens: 32
+
+num_trials: 3
+warmup_trials: 1
+
+# INT8: 2x reduction vs FP16
+# INT4: 4x reduction vs FP16
+# INT3: 3-bit grid stored in int8, so accuracy test more than true memory win
+quant_bits: [8, 4, 3]
+
+output_csv: "results/raw/quant_gpu.csv"
