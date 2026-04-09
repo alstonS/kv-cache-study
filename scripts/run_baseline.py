@@ -28,6 +28,9 @@ def main():
 
     input_lengths = config["input_lengths"]
     max_new_tokens = config["max_new_tokens"]
+    if isinstance(max_new_tokens, int):
+        max_new_tokens = [max_new_tokens]
+
     num_trials = config["num_trials"]
     warmup_trials = config["warmup_trials"]
     output_csv = config["output_csv"]
@@ -66,46 +69,47 @@ def main():
 
         actual_input_len = encoded["input_ids"].shape[1]
         print(f"Actual tokenized input length: {actual_input_len}")
+        for mnt in max_new_tokens:
+            print(f"max_new_tokens = {mnt}")
+            for i in range(warmup_trials):
+                print(f"Warmup {i+1}/{warmup_trials}")
+                _ = run_benchmark_trial(
+                    model=model,
+                    inputs=encoded,
+                    max_new_tokens=min(8, mnt),
+                    device=device,
+                )
 
-        for i in range(warmup_trials):
-            print(f"Warmup {i+1}/{warmup_trials}")
-            _ = run_benchmark_trial(
-                model=model,
-                inputs=encoded,
-                max_new_tokens=min(8, max_new_tokens),
-                device=device,
-            )
+            for trial in range(num_trials):
+                print(f"Trial {trial+1}/{num_trials}")
 
-        for trial in range(num_trials):
-            print(f"Trial {trial+1}/{num_trials}")
+                result = run_benchmark_trial(
+                    model=model,
+                    inputs=encoded,
+                    max_new_tokens=mnt,
+                    device=device,
+                )
 
-            result = run_benchmark_trial(
-                model=model,
-                inputs=encoded,
-                max_new_tokens=max_new_tokens,
-                device=device,
-            )
+                row = {
+                    "model_name": model_name,
+                    "device": device,
+                    "dtype": dtype_name,
+                    "input_length": actual_input_len,
+                    "max_new_tokens": mnt,
+                    "trial": trial + 1,
+                    "total_time_sec": result["total_time_sec"],
+                    "generated_tokens": result["generated_tokens"],
+                    "tokens_per_sec": result["tokens_per_sec"],
+                    "decode_tokens_per_sec": result["decode_tokens_per_sec"],
+                    "peak_memory_mb": result["peak_memory_mb"],
+                    "prefill_sec": result["prefill_sec"],
+                    "decode_sec": result["decode_sec"],
+                    "ttft_sec": result["ttft_sec"],
+                    "oom": result["oom"],
+                }
 
-            row = {
-                "model_name": model_name,
-                "device": device,
-                "dtype": dtype_name,
-                "input_length": actual_input_len,
-                "max_new_tokens": max_new_tokens,
-                "trial": trial + 1,
-                "total_time_sec": result["total_time_sec"],
-                "generated_tokens": result["generated_tokens"],
-                "tokens_per_sec": result["tokens_per_sec"],
-                "decode_tokens_per_sec": result["decode_tokens_per_sec"],
-                "peak_memory_mb": result["peak_memory_mb"],
-                "prefill_sec": result["prefill_sec"],
-                "decode_sec": result["decode_sec"],
-                "ttft_sec": result["ttft_sec"],
-                "oom": result["oom"],
-            }
-
-            append_result(output_csv, row)
-            print(row)
+                append_result(output_csv, row)
+                print(row)
 
     print(f"\nDone. Results saved to {output_csv}")
 

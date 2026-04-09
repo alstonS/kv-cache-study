@@ -2,7 +2,8 @@ model_name: "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
 device: "cuda"
 dtype: "float16"
 
-input_lengths: [512, 1024, 1536, 2048]
+# varying input length
+input_lengths: [256, 512, 1024, 1920]
 max_new_tokens: 128
 
 num_trials: 3
