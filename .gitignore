@@ -8,3 +8,6 @@ env/
 *.log
 .DS_Store
 
+# Local reference only — do not commit (external notebook / Gradio demo)
+pagedKV/
+

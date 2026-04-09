@@ -1,0 +1,19 @@
+# HuggingFace only (CPU-friendly). Use for pipeline checks without vLLM.
+model_name: "Qwen/Qwen2.5-0.5B-Instruct"
+device: "cpu"
+dtype: "float32"
+
+input_lengths: [128]
+max_new_tokens: 16
+
+num_trials: 1
+warmup_trials: 0
+
+batch_sizes: [1]
+
+frameworks:
+  - HuggingFace
+
+trust_remote_code: true
+
+output_csv: "results/raw/paged_hf_only.csv"

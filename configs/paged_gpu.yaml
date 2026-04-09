@@ -1,0 +1,24 @@
+# HuggingFace vs vLLM (PagedAttention). Requires CUDA + vLLM (see requirements-paged.txt).
+# Qwen2.5 instruct — swap to Qwen/Qwen2.5-7B-Instruct for large-model sweeps.
+model_name: "Qwen/Qwen2.5-1.5B-Instruct"
+device: "cuda"
+dtype: "float16"
+
+input_lengths: [256, 512, 1024]
+max_new_tokens: 32
+
+num_trials: 1
+warmup_trials: 1
+
+batch_sizes: [1]
+
+frameworks:
+  - HuggingFace
+  - vLLM
+
+tensor_parallel_size: 1
+vllm_dtype: "half"
+vllm_gpu_memory_utilization: 0.9
+trust_remote_code: true
+
+output_csv: "results/raw/paged.csv"

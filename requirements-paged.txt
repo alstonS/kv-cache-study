@@ -1,0 +1,4 @@
+# Optional: PagedAttention benchmarks (scripts/run_paged.py).
+# Install on CUDA Linux (or WSL2 with NVIDIA). vLLM does not support macOS.
+-r requirements.txt
+vllm>=0.5.0
