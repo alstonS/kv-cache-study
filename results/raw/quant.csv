@@ -1,0 +1,4 @@
+model_name,device,dtype,input_length,max_new_tokens,quant_bits,trial,total_time_sec,generated_tokens,tokens_per_sec,peak_memory_mb,prefill_sec,decode_sec,ttft_sec,oom
+TinyLlama/TinyLlama-1.1B-Chat-v1.0,cpu,float32,256,32,8,1,7.44164519200001,32,4.300124391095796,0.0,3.275843742999996,4.165801449000014,3.275843742999996,False
+TinyLlama/TinyLlama-1.1B-Chat-v1.0,cpu,float32,256,32,4,1,8.160683702000028,32,3.9212400784700683,0.0,2.3002463560000024,5.860437346000026,2.3002463560000024,False
+TinyLlama/TinyLlama-1.1B-Chat-v1.0,cpu,float32,256,32,3,1,6.330302986999982,32,5.055050297863427,0.0,2.2569140580000067,4.073388928999975,2.2569140580000067,False
