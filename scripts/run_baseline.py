@@ -31,6 +31,10 @@ def main():
     num_trials = config["num_trials"]
     warmup_trials = config["warmup_trials"]
     output_csv = config["output_csv"]
+    overwrite_output = config.get("overwrite_output", False)
+
+    if overwrite_output and os.path.exists(output_csv):
+        os.remove(output_csv)
 
     if device == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("torch.cuda.is_available() is False.")
