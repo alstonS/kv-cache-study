@@ -1,0 +1,2 @@
+model_name,device,dtype,input_length,max_new_tokens,quant_bits,trial,total_time_sec,generated_tokens,tokens_per_sec,decode_tokens_per_sec,model_memory_mb,peak_memory_mb,prefill_sec,decode_sec,ttft_sec,oom
+mistralai/Mistral-7B-Instruct-v0.2,cuda,float16,512,32,8,1,4.711637722999967,32,6.791693649066283,11.896829667026141,14324.5234375,14463.1875,2.0218454930000007,2.6897922299999664,2.0218454930000007,False
