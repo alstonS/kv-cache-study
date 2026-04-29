@@ -95,6 +95,7 @@ def main():
                     inputs=encoded,
                     max_new_tokens=mnt,
                     device=device,
+                    model_memory_mb=model_memory_mb,
                 )
 
                 row = {
