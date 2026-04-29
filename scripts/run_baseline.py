@@ -8,7 +8,7 @@ sys.path.append(os.path.abspath("."))
 
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from src.prompts import build_prompt_to_length
-from src.metrics import run_benchmark_trial
+from src.metrics import run_benchmark_trial, measure_model_memory_mb 
 from src.logger import append_result
 from src.utils import DTYPE_MAP
 
@@ -55,6 +55,12 @@ def main():
     ).to(device)
     model.eval()
 
+    # measure gpu memory before foward pass
+    # Derived metrics can subtract fixed model cost without noise
+    model_memory_mb = measure_model_memory_mb(model, device)
+    print(f"Model memory (weights only): {model_memory_mb:.1f} MB")
+
+
     print(f"CUDA available: {torch.cuda.is_available()}")
     print(f"Requested device: {device}")
     print(f"Model device: {next(model.parameters()).device}")
@@ -78,6 +84,7 @@ def main():
                     inputs=encoded,
                     max_new_tokens=min(8, mnt),
                     device=device,
+                    model_memory_mb=model_memory_mb,
                 )
 
             for trial in range(num_trials):
@@ -101,6 +108,7 @@ def main():
                     "generated_tokens": result["generated_tokens"],
                     "tokens_per_sec": result["tokens_per_sec"],
                     "decode_tokens_per_sec": result["decode_tokens_per_sec"],
+                    "model_memory_mb": result["model_memory_mb"],
                     "peak_memory_mb": result["peak_memory_mb"],
                     "prefill_sec": result["prefill_sec"],
                     "decode_sec": result["decode_sec"],

@@ -15,12 +15,26 @@ def get_peak_memory_mb(device: str) -> float:
     return 0.0
 
 
-def run_benchmark_trial(model, inputs, max_new_tokens: int, device: str):
+def measure_model_memory_mb(model, device: str) -> float:
+    # Measure the GPU memory occupied by model weights only
+    # records the fixed model cost separately from KV/activation,
+    # dequantization buffers, any overhead etc
+    # if cpu return 0.0
+    if device != "cuda":
+        return 0.0
+    
+    torch.cuda.synchronize()
+    if device == "cuda":
+        return torch.cuda.max_memory_allocated() / (1024 ** 2)
+
+
+def run_benchmark_trial(model, inputs, max_new_tokens: int, device: str, model_memory_mb: float = 0.0):
     result = {
         "total_time_sec": 0.0,
         "generated_tokens": 0,
         "tokens_per_sec": 0.0,
         "decode_tokens_per_sec": 0.0,
+        "model_memory_mb": model_memory_mb,
         "peak_memory_mb": 0.0,
         "prefill_sec": 0.0,
         "decode_sec": 0.0,

@@ -159,6 +159,7 @@ def run_benchmark_trial_quantized(
     max_new_tokens: int,
     device: str,
     nbits: int,
+    model_memory_mb: float = 0.0,
 ) -> dict:
     import time
 
@@ -167,6 +168,7 @@ def run_benchmark_trial_quantized(
         "generated_tokens": 0,
         "tokens_per_sec": 0.0,
         "decode_tokens_per_sec": 0.0,
+        "model_memory_mb": model_memory_mb,
         "peak_memory_mb": 0.0,
         "prefill_sec": 0.0,
         "decode_sec": 0.0,
