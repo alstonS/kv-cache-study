@@ -16,7 +16,11 @@ from src.kv_quant import run_benchmark_trial_quantized
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default="configs/quant.yaml")
+    parser.add_argument(
+        "--config",
+        type=str,
+        default="configs_new/quant_gpu.yaml",
+    )
     args = parser.parse_args()
 
     with open(args.config, "r") as f:

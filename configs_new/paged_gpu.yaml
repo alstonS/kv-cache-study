@@ -1,0 +1,26 @@
+# Mistral 7B on A100 — HuggingFace FP16 KV vs vLLM (PagedAttention).
+# Same sweep as baseline_gpu.yaml / quant_gpu.yaml; requires CUDA + vLLM (requirements-paged.txt).
+
+model_name: "mistralai/Mistral-7B-Instruct-v0.2"
+device: "cuda"
+dtype: "float16"
+
+input_lengths: [512, 1024, 2048, 4096]
+max_new_tokens: [32, 64, 128]
+
+num_trials: 3
+warmup_trials: 1
+
+batch_sizes: [1]
+
+frameworks:
+  - HuggingFace
+  - vLLM
+
+tensor_parallel_size: 1
+vllm_dtype: "half"
+vllm_gpu_memory_utilization: 0.9
+trust_remote_code: true
+
+output_csv: "results2/raw/paged_gpu.csv"
+overwrite_output: false

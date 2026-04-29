@@ -27,7 +27,11 @@ def main():
     parser = argparse.ArgumentParser(
         description="Benchmark HuggingFace vs vLLM (PagedAttention); logs CSV like baseline/kv_quant."
     )
-    parser.add_argument("--config", type=str, default="configs/paged_gpu.yaml")
+    parser.add_argument(
+        "--config",
+        type=str,
+        default="configs_new/paged_gpu.yaml",
+    )
     args = parser.parse_args()
 
     with open(args.config, "r") as f:
