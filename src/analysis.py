@@ -39,7 +39,37 @@ def load_runs(baseline_csv: str | Path | None = None, quant_csv: str | Path | No
         df["quant_bits"] = pd.NA
         frames.append(df)
 
-    return pd.concat(frames, ignore_index=True)
+    out = pd.concat(frames, ignore_index=True)
+    # CSV FIXES
+    # older CSVs don't have model_memory_mb
+    if "model_memory_mb" not in out.columns:
+        out["model_memory_mb"] = 0.0
+    else:
+        out["model_memory_mb"] = out["model_memory_mb"].fillna(0.0)
+
+    # baseline/quant CSVs don't have batch_size — fill with 1
+    if "batch_size" not in out.columns:
+        out["batch_size"] = 1
+    else:
+        out["batch_size"] = out["batch_size"].fillna(1).astype(int)
+
+    # engine_baseline_mb only in vLLM rows — fill missing with 0.0
+    if "engine_baseline_mb" not in out.columns:
+        out["engine_baseline_mb"] = 0.0
+    else:
+        out["engine_baseline_mb"] = pd.to_numeric(
+            out["engine_baseline_mb"], errors="coerce"
+        ).fillna(0.0)
+
+    # aggregate_tokens_per_sec — use tokens_per_sec if missing
+    if "aggregate_tokens_per_sec" not in out.columns:
+        out["aggregate_tokens_per_sec"] = out["tokens_per_sec"]
+    else:
+        out["aggregate_tokens_per_sec"] = out["aggregate_tokens_per_sec"].fillna(
+            out["tokens_per_sec"]
+        )
+
+    return out
 
 
 
@@ -59,35 +89,45 @@ NUMERIC_AGG_COLS = [
 
 GROUP_KEYS = ["method", "input_length", "max_new_tokens"]
 
+def _build_group_keys(df: pd.DataFrame) -> list:
+    """Include batch_size in grouping only when multiple values exist.
+    All baseline/quant runs are batch_size=1 so adding it would break the merge."""
+    if "batch_size" in df.columns and df["batch_size"].nunique() > 1:
+        return GROUP_KEYS + ["batch_size"]
+    return list(GROUP_KEYS)
+
 # drop oom and calculate mean and std for the non-oom trials
 def aggregate_trials(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return df
-    
+
+    gkeys = _build_group_keys(df)
+    agg_cols = [c for c in NUMERIC_AGG_COLS if c in df.columns]
+
     success = (
-        df.groupby(GROUP_KEYS)["oom"]
+        df.groupby(gkeys)["oom"]
         .apply(lambda s: (~s.astype(bool)).mean())
         .rename("success_rate")
         .reset_index()
     )
-    
+
     clean = df[~df["oom"].astype(bool)].copy()
 
     if clean.empty:
         out = success.copy()
-        for col in NUMERIC_AGG_COLS:
+        for col in agg_cols:
             out[col] = np.nan
             out[col + "_std"] = np.nan
         return out
 
     means = (
-        clean.groupby(GROUP_KEYS)[NUMERIC_AGG_COLS]
+        clean.groupby(gkeys)[agg_cols]
         .mean()
         .reset_index()
     )
 
     stds = (
-        clean.groupby(GROUP_KEYS)[NUMERIC_AGG_COLS]
+        clean.groupby(gkeys)[agg_cols]
         .std(ddof=1)
         .fillna(0.0)
         .add_suffix("_std")
@@ -96,20 +136,20 @@ def aggregate_trials(df: pd.DataFrame) -> pd.DataFrame:
 
     id_cols = [
         c for c in df.columns
-        if c not in NUMERIC_AGG_COLS + GROUP_KEYS + ["trial", "oom"]
+        if c not in agg_cols + gkeys + ["trial", "oom"]
     ]
     if id_cols:
         ids = (
-            clean.groupby(GROUP_KEYS)[id_cols]
+            clean.groupby(gkeys)[id_cols]
             .first()
             .reset_index()
         )
     else:
-        ids = pd.DataFrame(columns=GROUP_KEYS)
+        ids = pd.DataFrame(columns=gkeys)
 
-    out = means.merge(stds, on=GROUP_KEYS).merge(success, on=GROUP_KEYS)
+    out = means.merge(stds, on=gkeys).merge(success, on=gkeys)
     if not ids.empty:
-        out = out.merge(ids, on=GROUP_KEYS, how="left")
+        out = out.merge(ids, on=gkeys, how="left")
 
     return out
 
