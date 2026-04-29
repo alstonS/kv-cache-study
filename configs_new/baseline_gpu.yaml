@@ -1,0 +1,12 @@
+model_name: "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+device: "cuda"
+dtype: "float16"
+
+input_lengths: [512, 1024, 1536, 1920]
+max_new_tokens: [32, 64, 128]        # removed 256
+
+num_trials: 3
+warmup_trials: 1
+
+output_csv: "results2/raw/baseline_gpu.csv"
+overwrite_output: false

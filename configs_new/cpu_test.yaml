@@ -1,0 +1,13 @@
+model_name: "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+device: "cuda"
+dtype: "float16"
+
+input_lengths: [256, 512]
+max_new_tokens: [32]
+
+num_trials: 1
+warmup_trials: 0
+quant_bits: [8, 4]
+
+output_csv: "results2/raw/cpu_test.csv"
+overwrite_output: true
