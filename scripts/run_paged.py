@@ -10,11 +10,12 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 
 from src.prompts import build_prompt_to_length
 from src.logger import append_result
-from src.metrics import measure_model_memory_mb
 from src.utils import DTYPE_MAP
+from src.metrics import measure_model_memory_mb
 from src.kv_paged import (
     _normalize_max_new_tokens,
     build_vllm_engine,
+    capture_engine_baseline_mb,
     run_hf_trial,
     run_vllm_trial,
 )
@@ -55,7 +56,6 @@ def main():
     vllm_dtype = config.get("vllm_dtype", "half")
     vllm_gpu_memory_utilization = float(config.get("vllm_gpu_memory_utilization", 0.9))
     trust_remote_code = config.get("trust_remote_code", True)
-    model_memory_mb = config.get("model_memory_mb", None)
 
     if overwrite_output and os.path.exists(output_csv):
         os.remove(output_csv)
@@ -69,8 +69,6 @@ def main():
         tokenizer.pad_token = tokenizer.eos_token
 
     def run_sweep_hf():
-        nonlocal model_memory_mb
-
         print(f"\n=== Framework: HuggingFace ===")
         print(f"Loading model: {model_name}")
         model = AutoModelForCausalLM.from_pretrained(
@@ -79,6 +77,8 @@ def main():
             trust_remote_code=trust_remote_code,
         ).to(device)
         model.eval()
+
+        # Measure weight-only GPU memory once before any forward pass.
         model_memory_mb = measure_model_memory_mb(model, device)
         print(f"Model memory (weights only): {model_memory_mb:.1f} MB")
 
@@ -103,6 +103,7 @@ def main():
                             batch_size=bs,
                             max_new_tokens=min(8, mnt),
                             device=device,
+                            model_memory_mb=model_memory_mb,
                         )
 
                     for trial in range(num_trials):
@@ -114,6 +115,7 @@ def main():
                             batch_size=bs,
                             max_new_tokens=mnt,
                             device=device,
+                            model_memory_mb=model_memory_mb,
                         )
                         row = {
                             "model_name": model_name,
@@ -128,7 +130,8 @@ def main():
                             "generated_tokens": result["generated_tokens"],
                             "tokens_per_sec": result["tokens_per_sec"],
                             "decode_tokens_per_sec": result["decode_tokens_per_sec"],
-                            "model_memory_mb": model_memory_mb,
+                            "aggregate_tokens_per_sec": result.get("aggregate_tokens_per_sec", result["tokens_per_sec"]),
+                            "model_memory_mb": result.get("model_memory_mb", model_memory_mb),
                             "peak_memory_mb": result["peak_memory_mb"],
                             "prefill_sec": _fmt_csv(result.get("prefill_sec")),
                             "decode_sec": _fmt_csv(result.get("decode_sec")),
@@ -155,6 +158,10 @@ def main():
             trust_remote_code=trust_remote_code,
         )
 
+        engine_baseline_mb = capture_engine_baseline_mb(device)
+        model_memory_mb = engine_baseline_mb
+        print(f"vLLM engine baseline memory: {engine_baseline_mb:.1f} MB")
+
         for input_len in input_lengths:
             print(f"\nRunning input length = {input_len}")
             prompt = build_prompt_to_length(tokenizer, input_len)
@@ -176,6 +183,8 @@ def main():
                             batch_size=bs,
                             max_new_tokens=min(8, mnt),
                             device=device,
+                            model_memory_mb=model_memory_mb,
+                            engine_baseline_mb=engine_baseline_mb,
                         )
 
                     for trial in range(num_trials):
@@ -187,6 +196,8 @@ def main():
                             batch_size=bs,
                             max_new_tokens=mnt,
                             device=device,
+                            model_memory_mb=model_memory_mb,
+                            engine_baseline_mb=engine_baseline_mb,
                         )
                         row = {
                             "model_name": model_name,
@@ -201,7 +212,9 @@ def main():
                             "generated_tokens": result["generated_tokens"],
                             "tokens_per_sec": result["tokens_per_sec"],
                             "decode_tokens_per_sec": result["decode_tokens_per_sec"],
-                            "model_memory_mb": _fmt_csv(model_memory_mb),
+                            "aggregate_tokens_per_sec": result.get("aggregate_tokens_per_sec", result["tokens_per_sec"]),
+                            "model_memory_mb": result.get("model_memory_mb", model_memory_mb),
+                            "engine_baseline_mb": result.get("engine_baseline_mb", engine_baseline_mb),
                             "peak_memory_mb": result["peak_memory_mb"],
                             "prefill_sec": _fmt_csv(result.get("prefill_sec")),
                             "decode_sec": _fmt_csv(result.get("decode_sec")),

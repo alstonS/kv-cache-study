@@ -32,9 +32,11 @@ def run_hf_trial(
     batch_size: int,
     max_new_tokens: int,
     device: str,
+    model_memory_mb: float = 0.0,
 ) -> Dict[str, Any]:
     """
     Greedy generation with HF. batch_size==1 matches baseline/kv_quant manual decode metrics.
+    model_memory_mb: captured once after model.to(device), before any forward pass.
     """
     if batch_size < 1:
         raise ValueError("batch_size must be >= 1")
@@ -42,7 +44,8 @@ def run_hf_trial(
     if batch_size == 1:
         encoded = tokenizer(prompt, return_tensors="pt", add_special_tokens=False)
         encoded = {k: v.to(device) for k, v in encoded.items()}
-        return run_benchmark_trial(model, encoded, max_new_tokens, device)
+        return run_benchmark_trial(model, encoded, max_new_tokens, device,
+                                   model_memory_mb=model_memory_mb)
 
     prompts = [prompt] * batch_size
     inputs = tokenizer(
@@ -58,6 +61,8 @@ def run_hf_trial(
         "generated_tokens": 0,
         "tokens_per_sec": 0.0,
         "decode_tokens_per_sec": 0.0,
+        "aggregate_tokens_per_sec": 0.0,
+        "model_memory_mb": model_memory_mb,
         "peak_memory_mb": 0.0,
         "prefill_sec": None,
         "decode_sec": None,
@@ -94,14 +99,16 @@ def run_hf_trial(
 
         total_time = t1 - t0
         peak = get_peak_memory_mb(device)
-        tps = generated / total_time if total_time > 0 else 0.0
+        aggregate_tps = generated / total_time if total_time > 0 else 0.0
+        per_request_tps = aggregate_tps / batch_size
 
         result.update(
             {
                 "total_time_sec": total_time,
                 "generated_tokens": generated,
-                "tokens_per_sec": tps,
-                "decode_tokens_per_sec": tps,
+                "tokens_per_sec": aggregate_tps,
+                "decode_tokens_per_sec": per_request_tps,
+                "aggregate_tokens_per_sec": aggregate_tps,
                 "peak_memory_mb": peak,
             }
         )
@@ -140,6 +147,19 @@ def build_vllm_engine(
     )
 
 
+def capture_engine_baseline_mb(device: str) -> float:
+    """
+    Call this one time right after build_vllm_engine() returns
+    It records the memory vLLM pre-allocated for its KV pool so that
+    per trial peak_memory readings are correct
+    Without this, every trial shows the full pool size and wont see trial KV usage
+    """
+    if device != "cuda":
+        return 0.0
+    torch.cuda.synchronize()
+    return torch.cuda.max_memory_allocated() / (1024 ** 2)
+
+
 def run_vllm_trial(
     llm,
     tokenizer: PreTrainedTokenizerBase,
@@ -147,8 +167,17 @@ def run_vllm_trial(
     batch_size: int,
     max_new_tokens: int,
     device: str,
+    model_memory_mb: float = 0.0,
+    engine_baseline_mb: float = 0.0,
 ) -> Dict[str, Any]:
-    """Single batched ``generate`` call; peak memory via PyTorch CUDA allocator."""
+    """Single batched generate call via vLLM.
+
+    model_memory_mb    : weight-only memory, same concept as baseline/quant.
+    engine_baseline_mb : full KV pool pre-allocated at startup.
+                         Store this so analysis can compute incremental KV usage:
+                            kv_used = peak_memory_mb - engine_baseline_mb
+    prefill_sec / decode_sec / ttft_sec WILL BE Empty
+    """
     try:
         from vllm import SamplingParams  # type: ignore
     except ImportError as e:
@@ -165,6 +194,9 @@ def run_vllm_trial(
         "generated_tokens": 0,
         "tokens_per_sec": 0.0,
         "decode_tokens_per_sec": 0.0,
+        "aggregate_tokens_per_sec": 0.0,
+        "model_memory_mb": model_memory_mb,
+        "engine_baseline_mb": engine_baseline_mb,
         "peak_memory_mb": 0.0,
         "prefill_sec": None,
         "decode_sec": None,
@@ -193,14 +225,16 @@ def run_vllm_trial(
 
         total_time = t1 - t0
         peak = get_peak_memory_mb(device)
-        tps = generated / total_time if total_time > 0 else 0.0
+        aggregate_tps = generated / total_time if total_time > 0 else 0.0
+        per_request_tps = aggregate_tps / batch_size
 
         result.update(
             {
                 "total_time_sec": total_time,
                 "generated_tokens": generated,
-                "tokens_per_sec": tps,
-                "decode_tokens_per_sec": tps,
+                "tokens_per_sec": aggregate_tps,
+                "decode_tokens_per_sec": per_request_tps,
+                "aggregate_tokens_per_sec": aggregate_tps,
                 "peak_memory_mb": peak,
             }
         )
