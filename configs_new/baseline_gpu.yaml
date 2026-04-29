@@ -1,9 +1,10 @@
-model_name: "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+# mistral 7B on A100
+model_name: "mistralai/Mistral-7B-Instruct-v0.2"
 device: "cuda"
 dtype: "float16"
 
-input_lengths: [512, 1024, 1536, 1920]
-max_new_tokens: [32, 64, 128]        # removed 256
+input_lengths: [512, 1024, 2048, 4096]
+max_new_tokens: [32, 64, 128]
 
 num_trials: 3
 warmup_trials: 1

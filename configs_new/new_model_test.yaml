@@ -1,0 +1,13 @@
+model_name: "mistralai/Mistral-7B-Instruct-v0.2"
+device: "cuda"
+dtype: "float16"
+
+input_lengths: [512]
+max_new_tokens: [32]
+quant_bits: [8]
+
+num_trials: 1
+warmup_trials: 0
+
+output_csv: "results2/raw/test_mistral7b_quant.csv"
+overwrite_output: true
