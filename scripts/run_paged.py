@@ -103,7 +103,7 @@ def main():
                             batch_size=bs,
                             max_new_tokens=min(8, mnt),
                             device=device,
-                            model_memory_mb=model_memory_mb,
+                            
                         )
 
                     for trial in range(num_trials):
@@ -115,7 +115,7 @@ def main():
                             batch_size=bs,
                             max_new_tokens=mnt,
                             device=device,
-                            model_memory_mb=model_memory_mb,
+
                         )
                         row = {
                             "model_name": model_name,
@@ -132,6 +132,7 @@ def main():
                             "decode_tokens_per_sec": result["decode_tokens_per_sec"],
                             "aggregate_tokens_per_sec": result.get("aggregate_tokens_per_sec", result["tokens_per_sec"]),
                             "model_memory_mb": result.get("model_memory_mb", model_memory_mb),
+                            "engine_baseline_mb": "",
                             "peak_memory_mb": result["peak_memory_mb"],
                             "prefill_sec": _fmt_csv(result.get("prefill_sec")),
                             "decode_sec": _fmt_csv(result.get("decode_sec")),
