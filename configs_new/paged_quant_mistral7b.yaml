@@ -1,0 +1,29 @@
+# vLLM PagedAttention + KV cache quantization benchmark.
+# Model: mistralai/Mistral-7B-Instruct-v0.2
+# Requires CUDA + vLLM (see requirements-paged.txt).
+# FP8 KV cache requires Hopper/Ada GPU (H100, RTX 4090+).
+# Use kv_cache_dtypes: ["auto"] on older GPUs (A100, V100).
+
+model_name: "mistralai/Mistral-7B-Instruct-v0.2"
+device: "cuda"
+dtype: "float16"
+
+input_lengths: [256, 512, 1024, 2048]
+max_new_tokens: 32
+
+num_trials: 3
+warmup_trials: 1
+
+batch_sizes: [1]
+
+# "auto"  = no KV quantization (baseline paged)
+# "fp8"   = FP8 KV cache (PagedAttention + quantization)
+kv_cache_dtypes:
+  - "fp8"
+
+tensor_parallel_size: 1
+vllm_dtype: "half"
+vllm_gpu_memory_utilization: 0.9
+trust_remote_code: true
+
+output_csv: "results/raw/paged_quant_mistral7b.csv"
