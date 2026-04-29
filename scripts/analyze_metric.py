@@ -7,8 +7,9 @@
 
 # to execute program do: 
 # python3 scripts/analyze_results.py 
-#   --baseline-csv results2/raw/final_mistral7b_baseline_grid.csv \
-#   --quant-csv results2/raw/final_mistral7b_quant_grid.csv \
+#   --baseline-csv results2/raw/baseline_gpu.csv \
+#   --quant-csv results2/raw/quant_gpu.csv \
+#   --paged-csv results2/raw/paged_gpu.csv \
 
 
 import argparse
