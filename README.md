@@ -2,7 +2,7 @@
 
 A benchmark comparing four KV cache strategies for serving Mistral 7B on an A100 40GB:
 **FP16 baseline**, **INT8/INT4/INT3 quantization**, and **vLLM PagedAttention**. The goal
-is to characterize the real-world memory–throughput tradeoff each method makes, so a
+is to characterize the real world memory throughput tradeoff each method makes, so a
 you can pick the right one for a given workload
 
 
@@ -98,53 +98,3 @@ kv-cache-study/
 └── app.py               # Streamlit dashboard
 ```
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-## Baseline
-The baseline uses standard HuggingFace Transformers generation with full-precision KV cache.
-
-## Metrics
-- Peak GPU memory
-- Total generation time
-- Decode throughput
-
-## First run
-```bash
-python scripts/run_baseline.py
-```
-
-## Static dashboard
-Install the Python dependencies, then launch the local Streamlit app from the
-repository root:
-
-```bash
-python3 -m pip install -r requirements.txt
-streamlit run app.py
-```
-
-The app reads the static CSVs and generated PNGs under `results2/`. It does not
-require a GPU unless you choose to rerun the benchmark commands shown in the UI.
-
-## Notes
-- Start with a small model to debug the pipeline.
-- After the baseline works, extend this harness with TTFT, prefill/decode separation, OOM handling, and larger models.
