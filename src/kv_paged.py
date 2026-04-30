@@ -5,7 +5,8 @@ HF path (batch_size == 1) reuses the manual prefill/decode loop in ``metrics.run
 for comparable TTFT/prefill/decode fields. Larger batches use ``model.generate`` (single call),
 so prefill/decode are not split.
 
-vLLM path times a single ``llm.generate`` call; prefill/decode/TTFT are not separated here.
+vLLM path times ``llm.generate`` and uses request metrics, when available, for TTFT.
+For analysis alignment, vLLM uses TTFT as prefill time and the remainder as decode time.
 """
 
 from __future__ import annotations
@@ -147,19 +148,6 @@ def build_vllm_engine(
     )
 
 
-def capture_engine_baseline_mb(device: str) -> float:
-    """
-    Call this one time right after build_vllm_engine() returns
-    It records the memory vLLM pre-allocated for its KV pool so that
-    per trial peak_memory readings are correct
-    Without this, every trial shows the full pool size and wont see trial KV usage
-    """
-    if device != "cuda":
-        return 0.0
-    torch.cuda.synchronize()
-    return torch.cuda.max_memory_allocated() / (1024 ** 2)
-
-
 def run_vllm_trial(
     llm,
     tokenizer: PreTrainedTokenizerBase,
@@ -168,15 +156,13 @@ def run_vllm_trial(
     max_new_tokens: int,
     device: str,
     model_memory_mb: float = 0.0,
-    engine_baseline_mb: float = 0.0,
 ) -> Dict[str, Any]:
     """Single batched generate call via vLLM.
 
-    model_memory_mb    : weight-only memory, same concept as baseline/quant.
-    engine_baseline_mb : full KV pool pre-allocated at startup.
-                         Store this so analysis can compute incremental KV usage:
-                            kv_used = peak_memory_mb - engine_baseline_mb
-    prefill_sec / decode_sec / ttft_sec WILL BE Empty
+    model_memory_mb: weight-only memory, same concept as baseline/quant.
+    ttft_sec: first-token latency from vLLM request metrics when exposed.
+    prefill_sec: set equal to ttft_sec for comparison with baseline/quant.
+    decode_sec: total generation time minus ttft_sec.
     """
     try:
         from vllm import SamplingParams  # type: ignore
@@ -196,7 +182,6 @@ def run_vllm_trial(
         "decode_tokens_per_sec": 0.0,
         "aggregate_tokens_per_sec": 0.0,
         "model_memory_mb": model_memory_mb,
-        "engine_baseline_mb": engine_baseline_mb,
         "peak_memory_mb": 0.0,
         "prefill_sec": None,
         "decode_sec": None,
@@ -213,6 +198,7 @@ def run_vllm_trial(
         t1 = time.perf_counter()
 
         generated = 0
+        ttfts = []
         for req in outputs:
             for comp in req.outputs:
                 tid = getattr(comp, "token_ids", None)
@@ -223,7 +209,15 @@ def run_vllm_trial(
                     text = getattr(comp, "text", "") or ""
                     generated += len(tokenizer.encode(text, add_special_tokens=False))
 
+            metrics = getattr(req, "metrics", None)
+            arrival_time = getattr(metrics, "arrival_time", None)
+            first_token_time = getattr(metrics, "first_token_time", None)
+            if arrival_time is not None and first_token_time is not None:
+                ttfts.append(first_token_time - arrival_time)
+
         total_time = t1 - t0
+        ttft = float(sum(ttfts) / len(ttfts)) if ttfts else None
+        decode_sec = total_time - ttft if ttft is not None else None
         peak = get_peak_memory_mb(device)
         aggregate_tps = generated / total_time if total_time > 0 else 0.0
         per_request_tps = aggregate_tps / batch_size
@@ -236,6 +230,9 @@ def run_vllm_trial(
                 "decode_tokens_per_sec": per_request_tps,
                 "aggregate_tokens_per_sec": aggregate_tps,
                 "peak_memory_mb": peak,
+                "prefill_sec": ttft,
+                "decode_sec": decode_sec,
+                "ttft_sec": ttft,
             }
         )
     except Exception as exc:
